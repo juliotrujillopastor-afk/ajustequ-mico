@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Balanceador de Ecuaciones Químicas</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      text-align: center;
+      background: #f4f6f8;
+      padding: 40px;
+    }
+    input {
+      width: 70%;
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      background: #0078d7;
+      color: white;
+      cursor: pointer;
+      margin-left: 10px;
+    }
+    button:hover { background: #005fa3; }
+    #resultado {
+      margin-top: 30px;
+      font-size: 18px;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>⚗️ Balanceador de Ecuaciones Químicas</h1>
+  <p>Escribe una ecuación sin ajustar, por ejemplo:<br><b>KMnO4 + HCl = KCl + MnCl2 + H2O + Cl2</b></p>
+
+  <input id="ecuacion" placeholder="Tu ecuación aquí">
+  <button onclick="balancear()">Balancear</button>
+
+  <div id="resultado"></div>
+
+  <script>
+    // === Algoritmo de balanceo químico en JavaScript (funciona sin internet) ===
+
+    function parseFormula(formula) {
+      const tokens = formula.match(/([A-Z][a-z]?|\(|\)|\d+)/g);
+      const stack = [{}];
+      let i = 0;
+      while (i < tokens.length) {
+        const t = tokens[i];
+        if (t === "(") {
+          stack.push({});
+          i++;
+        } else if (t === ")") {
+          i++;
+          let mult = 1;
+          if (i < tokens.length && /^\d+$/.test(tokens[i])) {
+            mult = parseInt(tokens[i]);
+            i++;
+          }
+          const group = stack.pop();
+          for (const el in group) {
+            stack[stack.length - 1][el] =
+              (stack[stack.length - 1][el] || 0) + group[el] * mult;
+          }
+        } else if (/^\d+$/.test(t)) {
+          i++;
+        } else {
+          let el = t;
+          let cnt = 1;
+          if (i + 1 < tokens.length && /^\d+$/.test(tokens[i + 1])) {
+            cnt = parseInt(tokens[i + 1]);
+            i++;
+          }
+          stack[stack.length - 1][el] =
+            (stack[stack.length - 1][el] || 0) + cnt;
+          i++;
+        }
+      }
+      return stack[0];
+    }
+
+    function gcd(a, b) {
+      return b ? gcd(b, a % b) : a;
+    }
+
+    function lcm(a, b) {
+      return (a * b) / gcd(a, b);
+    }
+
+    function lcmList(lst) {
+      return lst.reduce((a, b) => lcm(a, b), 1);
+    }
+
+    function buildMatrix(left, right) {
+      const compounds = left.concat(right);
+      const parsed = compounds.map(parseFormula);
+      const elems = Array.from(
+        new Set(parsed.flatMap((p) => Object.keys(p)))
+      ).sort();
+      const mat = elems.map((el) =>
+        parsed.map((p, i) => (i < left.length ? p[el] || 0 : -(p[el] || 0)))
+      );
+      return [mat, elems];
+    }
+
+    // Resolver sistema homogéneo Ax = 0 (básico)
+    function solveBalance(matrix) {
+      const rows = matrix.length;
+      const cols = matrix[0].length;
+      let M = matrix.map((r) => r.map((x) => x));
+      let rank = 0;
+      const pivots = [];
+      for (let c = 0; c < cols; c++) {
+        let pivot = -1;
+        for (let i = rank; i < rows; i++) {
+          if (M[i][c] !== 0) { pivot = i; break; }
+        }
+        if (pivot === -1) continue;
+        [M[rank], M[pivot]] = [M[pivot], M[rank]];
+        const lead = M[rank][c];
+        M[rank] = M[rank].map((x) => x / lead);
+        for (let i = 0; i < rows; i++) {
+          if (i !== rank && M[i][c] !== 0) {
+            const f = M[i][c];
+            M[i] = M[i].map((x, j) => x - f * M[rank][j]);
+          }
+        }
+        pivots.push([rank, c]);
+        rank++;
+      }
+
+      const pivotCols = pivots.map(([, c]) => c);
+      const freeCols = Array.from({ length: cols }, (_, i) =>
+        pivotCols.includes(i) ? null : i
+      ).filter((x) => x !== null);
+
+      if (freeCols.length === 0) return null;
+      const vec = Array(cols).fill(0);
+      vec[freeCols[0]] = 1;
+      for (let [r, c] of pivots.reverse()) {
+        let s = 0;
+        for (let f of freeCols) s += M[r][f] * vec[f];
+        vec[c] = -s;
+      }
+      return vec;
+    }
+
+    function normalizeCoeffs(vec) {
+      const denoms = vec.map((x) => 1 / (x % 1 || 1));
+      const mult = lcmList(denoms.map(Math.round));
+      const ints = vec.map((x) => Math.round(x * mult));
+      const g = ints.reduce((a, b) => gcd(a, Math.abs(b)), Math.abs(ints[0]));
+      const result = ints.map((x) => x / g);
+      return result.map((x) => (x < 0 ? -x : x));
+    }
+
+    function balanceEquation(eq) {
+      eq = eq.replace("=", "->");
+      const [leftStr, rightStr] = eq.split("->");
+      const left = leftStr.split("+").map((s) => s.trim());
+      const right = rightStr.split("+").map((s) => s.trim());
+      const [mat] = buildMatrix(left, right);
+      const vec = solveBalance(mat);
+      if (!vec) return null;
+      const coeffs = normalizeCoeffs(vec);
+      return [
+        left.map((c, i) => [coeffs[i], c]),
+        right.map((c, i) => [coeffs[i + left.length], c]),
+      ];
+    }
+
+    function formatBalanced(result) {
+      const [left, right] = result;
+      const fmt = (coef, comp) => (coef === 1 ? comp : coef + " " + comp);
+      return (
+        left.map(([c, x]) => fmt(c, x)).join(" + ") +
+        " → " +
+        right.map(([c, x]) => fmt(c, x)).join(" + ")
+      );
+    }
+
+    function balancear() {
+      const eq = document.getElementById("ecuacion").value.trim();
+      if (!eq) return alert("Introduce una ecuación química.");
+      const res = balanceEquation(eq);
+      if (!res)
+        document.getElementById("resultado").innerHTML =
+          "❌ No se pudo balancear.";
+      else
+        document.getElementById("resultado").innerHTML =
+          "✅ " + formatBalanced(res);
+    }
+  </script>
+</body>
+</html>
