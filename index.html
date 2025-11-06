@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Balanceador de Ecuaciones Químicas</title>
+  <title>Ajuste de Ecuaciones Químicas</title>
   <style>
     body {
       font-family: "Segoe UI", Arial, sans-serif;
@@ -36,11 +36,11 @@
   </style>
 </head>
 <body>
-  <h1>⚗️ Balanceador de Ecuaciones Químicas</h1>
+  <h1>⚗️ Ajuste de Ecuaciones Químicas</h1>
   <p>Escribe una ecuación sin ajustar, por ejemplo:<br><b>KMnO4 + HCl = KCl + MnCl2 + H2O + Cl2</b></p>
 
   <input id="ecuacion" placeholder="Tu ecuación aquí">
-  <button onclick="balancear()">Balancear</button>
+  <button onclick="balancear()">Ajustar</button>
 
   <div id="resultado"></div>
 
@@ -191,7 +191,7 @@
       const res = balanceEquation(eq);
       if (!res)
         document.getElementById("resultado").innerHTML =
-          "❌ No se pudo balancear.";
+          "❌ No se pudo ajustar.";
       else
         document.getElementById("resultado").innerHTML =
           "✅ " + formatBalanced(res);
@@ -199,3 +199,4 @@
   </script>
 </body>
 </html>
+
